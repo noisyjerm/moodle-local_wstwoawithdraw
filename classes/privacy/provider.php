@@ -24,12 +24,11 @@
  */
 
 namespace local_wstwoawithdraw\privacy;
-
-// No direct access.
-defined('MOODLE_INTERNAL') || die();
-
 use core_privacy\local\metadata\null_provider;
 
+/**
+ * Privacy provider implementation for local WS TWOA withdraw student.
+ */
 class provider implements null_provider {
 
     /**

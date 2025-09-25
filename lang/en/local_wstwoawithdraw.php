@@ -26,14 +26,9 @@
 // No direct access.
 defined('MOODLE_INTERNAL') || die();
 
-// Default langstring.
-$string['pluginname']       = 'TWOA withdraw process webservices';
-
-// Strings for course stuff.
 $string['cohortnotfound']   = 'Cohort not found.';
 $string['notincohort']      = 'The student was not found in this cohort.';
+$string['pluginname']       = 'TWOA withdraw process webservices';
+$string['privacy:metadata'] = 'The local webservices withdraw plugin does not store any personal data.';
 $string['studentnotfound']  = 'No student was not found with this id.';
 $string['summary']          = 'Suspended from {$a->suspended} courses, unenrolled from {$a->unenrolled} courses.';
-
-// Strings for privacy API.
-$string['privacy:metadata'] = 'The local webservices withdraw plugin does not store any personal data.';

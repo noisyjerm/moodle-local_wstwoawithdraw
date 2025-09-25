@@ -15,10 +15,10 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Web services for TWOA grade report.
+ * Web services for TWOA withdraw student webservice.
  *
- * @package    gradereport_twoa
- * @copyright  2023 Te Wānanga o Aotearoa
+ * @package    local_wstwoawithdraw
+ * @copyright  2025, Te Wānanga o Aotearoa
  * @author     Jeremy FitzPatrick
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
@@ -39,6 +39,7 @@ $functions = [
 
 // We define the services to install as pre-built services. A pre-build service is not editable by administrator.
 $services = [
+
     'TWOA tauira withdrawn API' => [
         'shortname'          => 'twoa_withdraw',
         'functions'         => [

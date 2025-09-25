@@ -39,15 +39,18 @@ require_once($CFG->dirroot.'/lib/grade/grade_grade.php');
 require_once($CFG->dirroot.'/lib/grade/constants.php');
 require_once($CFG->dirroot.'/enrol/manual/externallib.php');
 
+
 /**
  * Class local_wstwoawithdraw_removestudent
  */
 class local_wstwoawithdraw_removestudent extends external_api {
     /** @var string Regular expression to match the grade category id on */
     const GRADECAT_PATTERN = '/(W[A-Z]{4}\d{3}|Q\d{5})(\.{1}\d{1,2})?/';
+    /** @var int Delay before completely removing student from the course. */
+    const GRACE_PERIOD = 21 * (24 * 60 * 60); // 21 days.
 
     /**
-     * Validate incoming parameters
+     *
      * @return \external_function_parameters
      */
     public static function unenrolstudent_parameters() {
@@ -78,10 +81,10 @@ class local_wstwoawithdraw_removestudent extends external_api {
     public static function unenrolstudent($userid, $classid) {
         global $DB;
         $suspended = 0;
-        $params  = self::validate_parameters(self::unenrolstudent_parameters(), ['userid' => $userid,'classid' => $classid]);
+        $params  = self::validate_parameters(self::unenrolstudent_parameters(), ['userid' => $userid, 'classid' => $classid]);
         $roleid  = $DB->get_field('role', 'id', ['shortname' => 'student'], MUST_EXIST);
-        $cohort  = $DB->get_record('cohort', array('idnumber' => $params['classid']), 'id, contextid, visible');
-        $student = $DB->get_record('user', array('id' => $params['userid']));
+        $cohort  = $DB->get_record('cohort', ['idnumber' => $params['classid']], 'id, contextid, visible');
+        $student = $DB->get_record('user', ['id' => $params['userid']]);
 
         // Start with basic checks.
         if (!$student) {
@@ -90,43 +93,64 @@ class local_wstwoawithdraw_removestudent extends external_api {
         if (!$cohort) {
             return ['success' => false, 'comment' => get_string('cohortnotfound', 'local_wstwoawithdraw')];
         }
-        if(!cohort_is_member($cohort->id, $params['userid'])) {
+        if (!cohort_is_member($cohort->id, $params['userid'])) {
             return ['success' => false, 'comment' => get_string('notincohort', 'local_wstwoawithdraw')];
         }
         // Get the enrolment methods (therefore courses) associated with this cohort.
-        $cohortEnrolInstances = $DB->get_records('enrol', array('enrol' => 'cohort', 'customint1' => $cohort->id));
+        $cohortenrolinstances = $DB->get_records('enrol', ['enrol' => 'cohort', 'customint1' => $cohort->id]);
         // Now look for graded activities in the courses this cohort is attached to.
-        foreach ($cohortEnrolInstances as $enrolMethod) {
-            $context = \context_course::instance($enrolMethod->courseid);
+        foreach ($cohortenrolinstances as $enrolmethod) {
+            $context = \context_course::instance($enrolmethod->courseid);
             self::validate_context($context);
             require_capability('enrol/manual:enrol', $context);
+            require_capability('moodle/cohort:assign', $context);
+
+            $data = [
+                'roleid'   => $roleid,
+                'userid'   => $params['userid'],
+                'courseid' => $enrolmethod->courseid,
+                'suspend'  => 1,
+                'timestart' => time(),
+            ];
 
             // Is graded in course.
-            $gradedActivities = self::getGradedActivities($enrolMethod->courseid);
-            foreach ($gradedActivities as $item) {
+            $lastaccess = $DB->get_field(
+                'user_last_access',
+                ['userid' => $params['userid'], 'courseid' => $enrolmethod->courseid]
+            );
+            $isgraded = false;
+            $gradedactivities = self::get_gradedactivities($enrolmethod->courseid);
+            foreach ($gradedactivities as $item) {
                 $grade = \grade_grade::fetch(['itemid' => $item->id, 'userid' => $params['userid']]);
 
                 if (gettype($grade) === 'object') {
-                    // Suspend
-                    $data = [
-                        'roleid'   => $roleid,
-                        'userid'   => $params['userid'],
-                        'courseid' => $enrolMethod->courseid,
-                        'suspend'  => 1
-                    ];
-                    \enrol_manual_external::enrol_users([$data]);
-                    $suspended ++;
+                    $isgraded = true;
                     break;
                 }
+            }
+
+            if ($isgraded) {
+                // Keep in the course.
+                \enrol_manual_external::enrol_users([$data]);
+                $suspended ++;
+            } else if ($lastaccess) {
+                // Keep in course for grace period.
+                $data['timeend'] = time() + self::GRACE_PERIOD;
+                \enrol_manual_external::enrol_users([$data]);
             }
         }
 
         // Remove from cohort.
-        require_capability('moodle/cohort:assign', $context);
         cohort_remove_member($cohort->id, $params['userid']);
 
-        $unenrolled = count($cohortEnrolInstances) - $suspended;
-        return ['success' => true, 'comment' => get_string('summary', 'local_wstwoawithdraw', (object)['suspended' => $suspended, 'unenrolled' => $unenrolled])];
+        $comment = (object)[
+            'suspended' => $suspended,
+            'unenrolled' => count($cohortenrolinstances) - $suspended,
+        ];
+        return [
+            'success' => true,
+            'comment' => get_string('summary', 'local_wstwoawithdraw', $comment),
+        ];
     }
 
     /**
@@ -141,17 +165,18 @@ class local_wstwoawithdraw_removestudent extends external_api {
     }
 
     /**
+     * Gets a list of activities that contribute to a summative grade.
      * @param integer $courseid
      * @return array
      */
-    private static function getGradedActivities($courseid) {
-        $allGradedItems = [];
-        $categories = \grade_item::fetch_all(array('courseid' => $courseid, 'itemtype' => 'category'));
+    private static function get_gradedactivities($courseid) {
+        $allgradeditems = [];
+        $categories = \grade_item::fetch_all(['courseid' => $courseid, 'itemtype' => 'category']);
         if (!$categories) {
             return [];
         }
         foreach ($categories as $key => $category) {
-            $isgraded = preg_match(SELF::GRADECAT_PATTERN, $category->idnumber);
+            $isgraded = preg_match(self::GRADECAT_PATTERN, $category->idnumber);
             // Todo: Do we need to handle false (preg error)?
             // Only keep graded categories.
             if ($isgraded !== 1) {
@@ -159,11 +184,11 @@ class local_wstwoawithdraw_removestudent extends external_api {
                 continue;
             }
 
-            if($gradedItems = self::getGradedItems($category)) {
-                $allGradedItems = array_merge($allGradedItems, $gradedItems);
+            if ($gradeditems = self::get_gradeditems($category)) {
+                $allgradeditems = array_merge($allgradeditems, $gradeditems);
             }
         }
-        return $allGradedItems;
+        return $allgradeditems;
     }
 
     /**
@@ -172,20 +197,20 @@ class local_wstwoawithdraw_removestudent extends external_api {
      * @param \grade_item $category
      * @return array
      */
-    private static function getGradedItems($category) {
-        $gradedItems = [];
+    private static function get_gradeditems($category) {
+        $gradeditems = [];
         if (!empty($category->calculation)) {
             // Get the grade items in the calculation.
-            $gi_pattern = '/(?!gi##)\d+(?=##)/';
-            preg_match_all($gi_pattern, $category->calculation, $giids);
+            $gipattern = '/(?!gi##)\d+(?=##)/';
+            preg_match_all($gipattern, $category->calculation, $giids);
             foreach ($giids[0] as $giid) {
                 $gi = \grade_item::fetch(['id' => $giid]);
-                array_push($gradedItems, $gi);
+                array_push($gradeditems, $gi);
             }
         } else {
             // Get the items in this category.
-            $gradedItems = \grade_item::fetch_all(['categoryid' => $category->iteminstance]);
+            $gradeditems = \grade_item::fetch_all(['categoryid' => $category->iteminstance]);
         }
-        return $gradedItems;
+        return $gradeditems;
     }
 }
