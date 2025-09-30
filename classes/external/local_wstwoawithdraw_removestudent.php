@@ -73,7 +73,7 @@ class local_wstwoawithdraw_removestudent extends external_api {
     }
 
     /**
-     * Remove the student from the course after checking for grades
+     * Remove the student from the course after checking for grades.
      * @param integer $userid Moodle's identifier for the student.
      * @param integer $classid SMS class identifier.
      * @return array
@@ -96,6 +96,7 @@ class local_wstwoawithdraw_removestudent extends external_api {
         if (!cohort_is_member($cohort->id, $params['userid'])) {
             return ['success' => false, 'comment' => get_string('notincohort', 'local_wstwoawithdraw')];
         }
+
         // Get the enrolment methods (therefore courses) associated with this cohort.
         $cohortenrolinstances = $DB->get_records('enrol', ['enrol' => 'cohort', 'customint1' => $cohort->id]);
         // Now look for graded activities in the courses this cohort is attached to.
@@ -105,6 +106,7 @@ class local_wstwoawithdraw_removestudent extends external_api {
             require_capability('enrol/manual:enrol', $context);
             require_capability('moodle/cohort:assign', $context);
 
+            // Prepare the basic data set for enrolment.
             $data = [
                 'roleid'   => $roleid,
                 'userid'   => $params['userid'],
@@ -113,13 +115,17 @@ class local_wstwoawithdraw_removestudent extends external_api {
                 'timestart' => time(),
             ];
 
-            // Is graded in course.
-            $lastaccess = $DB->get_field(
-                'user_last_access',
-                ['userid' => $params['userid'], 'courseid' => $enrolmethod->courseid]
-            );
+            // Get a list of all the assessed activities in this course.
+            $allgradeditems = [];
+            $gradedcategories = self::get_gradedcategories($enrolmethod->courseid);
+            foreach ($gradedcategories as $category) {
+                if ($gradeditems = self::get_gradeditems($category)) {
+                    $allgradeditems = array_merge($allgradeditems, $gradeditems);
+                }
+            }
+
+            // Is student graded in any of these activities?
             $isgraded = false;
-            $gradedactivities = self::get_gradedactivities($enrolmethod->courseid);
             foreach ($gradedactivities as $item) {
                 $grade = \grade_grade::fetch(['itemid' => $item->id, 'userid' => $params['userid']]);
 
@@ -128,6 +134,12 @@ class local_wstwoawithdraw_removestudent extends external_api {
                     break;
                 }
             }
+
+            // Get the last time the student accessed the course if ever.
+            $lastaccess = $DB->get_field(
+                'user_last_access',
+                ['userid' => $params['userid'], 'courseid' => $enrolmethod->courseid]
+            );
 
             if ($isgraded) {
                 // Keep in the course.
@@ -143,6 +155,7 @@ class local_wstwoawithdraw_removestudent extends external_api {
         // Remove from cohort.
         cohort_remove_member($cohort->id, $params['userid']);
 
+        // Provide some success status information.
         $comment = (object)[
             'suspended' => $suspended,
             'unenrolled' => count($cohortenrolinstances) - $suspended,
@@ -165,12 +178,11 @@ class local_wstwoawithdraw_removestudent extends external_api {
     }
 
     /**
-     * Gets a list of activities that contribute to a summative grade.
+     * Gets a list of grade categories that are graded (associated to a kōnae or unit standard).
      * @param integer $courseid
      * @return array
      */
-    private static function get_gradedactivities($courseid) {
-        $allgradeditems = [];
+    private static function get_gradedcategories($courseid) {
         $categories = \grade_item::fetch_all(['courseid' => $courseid, 'itemtype' => 'category']);
         if (!$categories) {
             return [];
@@ -183,12 +195,8 @@ class local_wstwoawithdraw_removestudent extends external_api {
                 unset($categories[$key]);
                 continue;
             }
-
-            if ($gradeditems = self::get_gradeditems($category)) {
-                $allgradeditems = array_merge($allgradeditems, $gradeditems);
-            }
         }
-        return $allgradeditems;
+        return $categories;
     }
 
     /**
