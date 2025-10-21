@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Version file for local_wstwoawithdraw.
+ * Settings for local_wstwoawithdraw.
  *
  * @package     local_wstwoawithdraw
  * @author      Jeremy FitzPatrick <jeremy.fitzpatrick@twoa.ac.nz>>
@@ -23,16 +23,18 @@
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-// No direct access.
-defined('MOODLE_INTERNAL') || die();
+defined('MOODLE_INTERNAL') || die;
 
-// This plugin requires Moodle 4.5.
-$plugin->requires = 2024100700;
+if ($hassiteconfig) {
+    $pluginsettings = new admin_settingpage('local_ws_twoawithdraw', get_string('pluginname', 'local_wstwoawithdraw'));
+    $name = new lang_string('graceperiod', 'local_wstwoawithdraw');
+    $description = new lang_string('graceperiod_help', 'local_wstwoawithdraw');
+    $graceperiod = 21 * (24 * 60 * 60);
+    $setting = new admin_setting_configduration('local_ws_twoawithdraw/graceperiod',
+        $name,
+        $description,
+        $graceperiod);
+    $pluginsettings->add($setting);
 
-// Plugin details.
-$plugin->component  = 'local_wstwoawithdraw';
-$plugin->version    = 2025090106;   // Plugin updated Mahuru 2025.
-$plugin->release    = 'v4.5-r1';
-
-// Plugin status details.
-$plugin->maturity = MATURITY_RC;   // ALPHA, BETA, RC, STABLE.
+    $ADMIN->add('localplugins', $pluginsettings);
+}

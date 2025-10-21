@@ -47,7 +47,6 @@ class local_wstwoawithdraw_removestudent extends external_api {
     /** @var string Regular expression to match the grade category id on */
     const GRADECAT_PATTERN = '/(W[A-Z]{4}\d{3}|Q\d{5})(\.{1}\d{1,2})?/';
     /** @var int Delay before completely removing student from the course. */
-    const GRACE_PERIOD = 21 * (24 * 60 * 60); // 21 days.
 
     /**
      *
@@ -126,7 +125,7 @@ class local_wstwoawithdraw_removestudent extends external_api {
 
             // Is student graded in any of these activities?
             $isgraded = false;
-            foreach ($gradedactivities as $item) {
+            foreach ($allgradeditems as $item) {
                 $grade = \grade_grade::fetch(['itemid' => $item->id, 'userid' => $params['userid']]);
 
                 if (gettype($grade) === 'object') {
@@ -138,6 +137,7 @@ class local_wstwoawithdraw_removestudent extends external_api {
             // Get the last time the student accessed the course if ever.
             $lastaccess = $DB->get_field(
                 'user_last_access',
+                'timeaccess',
                 ['userid' => $params['userid'], 'courseid' => $enrolmethod->courseid]
             );
 
@@ -147,7 +147,7 @@ class local_wstwoawithdraw_removestudent extends external_api {
                 $suspended ++;
             } else if ($lastaccess) {
                 // Keep in course for grace period.
-                $data['timeend'] = time() + self::GRACE_PERIOD;
+                $data['timeend'] = time() + get_config('local_wstwoawithdraw', 'graceperiod');
                 \enrol_manual_external::enrol_users([$data]);
             }
         }
@@ -189,7 +189,6 @@ class local_wstwoawithdraw_removestudent extends external_api {
         }
         foreach ($categories as $key => $category) {
             $isgraded = preg_match(self::GRADECAT_PATTERN, $category->idnumber);
-            // Todo: Do we need to handle false (preg error)?
             // Only keep graded categories.
             if ($isgraded !== 1) {
                 unset($categories[$key]);

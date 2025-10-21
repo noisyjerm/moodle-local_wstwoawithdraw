@@ -27,6 +27,9 @@
 defined('MOODLE_INTERNAL') || die();
 
 $string['cohortnotfound']   = 'Cohort not found.';
+$string['graceperiod']      = 'Grace period.';
+$string['graceperiod_help'] = 'The length of time of the manual enrolment, which effectively means
+                               the period before a student will be removed from the course.';
 $string['notincohort']      = 'The student was not found in this cohort.';
 $string['pluginname']       = 'TWOA withdraw process webservices';
 $string['privacy:metadata'] = 'The local webservices withdraw plugin does not store any personal data.';
