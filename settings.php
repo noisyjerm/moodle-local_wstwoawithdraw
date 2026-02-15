@@ -38,3 +38,9 @@ if ($hassiteconfig) {
 
     $ADMIN->add('localplugins', $pluginsettings);
 }
+
+$ADMIN->add("localplugins", new admin_externalpage(
+    'local_wstwoawithdraw_history',
+    get_string('history', 'local_wstwoawithdraw'),
+    new moodle_url("/local/wstwoawithdraw/report.php")
+));
