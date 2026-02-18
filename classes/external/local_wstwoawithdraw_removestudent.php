@@ -61,10 +61,22 @@ class local_wstwoawithdraw_removestudent extends external_api {
                     VALUE_REQUIRED,
                     0
                 ),
-                'classid'      => new external_value(
+                'cohortid'      => new external_value(
                     PARAM_INT,
-                    'The SMS id of the class which the student is to be unenrolled from',
+                    'The Moodle id of the cohort which the student is to be removed from',
                     VALUE_REQUIRED,
+                    0
+                ),
+                'withdrawalstatus' => new external_value(
+                    PARAM_ALPHA,
+                    'The enrolement status in the SMS of the student. Should be W, X or pseudo status D',
+                    VALUE_REQUIRED,
+                    'W'
+                ),
+                'testing' => new external_value(
+                    PARAM_BOOL,
+                    'No changes made.',
+                    VALUE_OPTIONAL,
                     0
                 ),
             ]
@@ -74,15 +86,22 @@ class local_wstwoawithdraw_removestudent extends external_api {
     /**
      * Remove the student from the course after checking for grades.
      * @param integer $userid Moodle's identifier for the student.
-     * @param integer $classid SMS class identifier.
+     * @param integer $cohortid Moodle's cohort identifier.
+     * @param string $withdrawalstatus SMS enrolement status.
      * @return array
      */
-    public static function unenrolstudent($userid, $classid) {
+    public static function unenrolstudent($userid, $cohortid, $withdrawalstatus, $testing) {
         global $DB;
         $suspended = 0;
-        $params  = self::validate_parameters(self::unenrolstudent_parameters(), ['userid' => $userid, 'classid' => $classid]);
+        $pending = 0;
+        $params  = self::validate_parameters(self::unenrolstudent_parameters(), [
+            'userid' => $userid,
+            'cohortid' => $cohortid,
+            'withdrawalstatus' => $withdrawalstatus,
+            'testing' => $testing,
+        ]);
         $roleid  = $DB->get_field('role', 'id', ['shortname' => 'student'], MUST_EXIST);
-        $cohort  = $DB->get_record('cohort', ['idnumber' => $params['classid']], 'id, contextid, visible');
+        $cohort  = $DB->get_record('cohort', ['id' => $params['cohortid']], 'id, contextid, visible');
         $student = $DB->get_record('user', ['id' => $params['userid']]);
 
         // Start with basic checks.
@@ -91,6 +110,9 @@ class local_wstwoawithdraw_removestudent extends external_api {
         }
         if (!$cohort) {
             return ['success' => false, 'comment' => get_string('cohortnotfound', 'local_wstwoawithdraw')];
+        }
+        if (!in_array($params['withdrawalstatus'], ['W', 'X', 'D'])) {
+            return ['success' => false, 'comment' => get_string('nostatus', 'local_wstwoawithdraw', $params['withdrawalstatus'])];
         }
         if (!cohort_is_member($cohort->id, $params['userid'])) {
             return ['success' => false, 'comment' => get_string('notincohort', 'local_wstwoawithdraw')];
@@ -101,6 +123,7 @@ class local_wstwoawithdraw_removestudent extends external_api {
         // Now look for graded activities in the courses this cohort is attached to.
         foreach ($cohortenrolinstances as $enrolmethod) {
             $context = \context_course::instance($enrolmethod->courseid);
+            $isgraded = false;
             self::validate_context($context);
             require_capability('enrol/manual:enrol', $context);
             require_capability('moodle/cohort:assign', $context);
@@ -114,51 +137,62 @@ class local_wstwoawithdraw_removestudent extends external_api {
                 'timestart' => time(),
             ];
 
-            // Get a list of all the assessed activities in this course.
-            $allgradeditems = [];
-            $gradedcategories = self::get_gradedcategories($enrolmethod->courseid);
-            foreach ($gradedcategories as $category) {
-                if ($gradeditems = self::get_gradeditems($category)) {
-                    $allgradeditems = array_merge($allgradeditems, $gradeditems);
+            // We can skip these checks for X and D if allowed in the config.
+            if (!get_config('local_wstwoawithdraw', 'skipchecks') || $params['withdrawalstatus'] === 'W') {
+                // Get a list of all the assessed activities in this course.
+                $allgradeditems = [];
+                $gradedcategories = self::get_gradedcategories($enrolmethod->courseid);
+                foreach ($gradedcategories as $category) {
+                    if ($gradeditems = self::get_gradeditems($category)) {
+                        $allgradeditems = array_merge($allgradeditems, $gradeditems);
+                    }
                 }
-            }
 
-            // Is student graded in any of these activities?
-            $isgraded = false;
-            foreach ($allgradeditems as $item) {
-                $grade = \grade_grade::fetch(['itemid' => $item->id, 'userid' => $params['userid']]);
+                // Is student graded in any of these activities?
+                foreach ($allgradeditems as $item) {
+                    $grade = \grade_grade::fetch(['itemid' => $item->id, 'userid' => $params['userid']]);
 
-                if (gettype($grade) === 'object') {
-                    $isgraded = true;
-                    break;
+                    if (gettype($grade) === 'object') {
+                        $isgraded = true;
+                        break;
+                    }
                 }
             }
 
             // Get the last time the student accessed the course if ever.
             $lastaccess = $DB->get_field(
-                'user_last_access',
+                'user_lastaccess',
                 'timeaccess',
                 ['userid' => $params['userid'], 'courseid' => $enrolmethod->courseid]
             );
 
             if ($isgraded) {
                 // Keep in the course.
-                \enrol_manual_external::enrol_users([$data]);
-                $suspended ++;
+                if (!$testing) {
+                    \enrol_manual_external::enrol_users([$data]);
+                }
+                $suspended++;
             } else if ($lastaccess) {
                 // Keep in course for grace period.
                 $data['timeend'] = time() + get_config('local_wstwoawithdraw', 'graceperiod');
-                \enrol_manual_external::enrol_users([$data]);
+                if (!$testing) {
+                    \enrol_manual_external::enrol_users([$data]);
+                }
+                $pending++;
             }
         }
 
         // Remove from cohort.
-        cohort_remove_member($cohort->id, $params['userid']);
+        if (!$testing) {
+            cohort_remove_member($cohort->id, $params['userid']);
+        }
 
         // Provide some success status information.
         $comment = (object)[
+            'user'      => $student->firstname . ' ' . $student->lastname,
             'suspended' => $suspended,
-            'unenrolled' => count($cohortenrolinstances) - $suspended,
+            'unenrolled' => count($cohortenrolinstances) - $suspended - $pending,
+            'pending'    => $pending,
         ];
         return [
             'success' => true,

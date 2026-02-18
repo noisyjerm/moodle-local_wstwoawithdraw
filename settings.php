@@ -36,6 +36,15 @@ if ($hassiteconfig) {
         $graceperiod);
     $pluginsettings->add($setting);
 
+    $name = new lang_string('skipchecks', 'local_wstwoawithdraw');
+    $description = new lang_string('skipchecks_help', 'local_wstwoawithdraw');
+    $setting = new admin_setting_configcheckbox('local_ws_twoawithdraw/skipchecks',
+        $name,
+        $description,
+        1
+    );
+    $pluginsettings->add($setting);
+
     $ADMIN->add('localplugins', $pluginsettings);
 }
 

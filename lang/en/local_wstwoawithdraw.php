@@ -28,7 +28,7 @@ defined('MOODLE_INTERNAL') || die();
 
 $string['action_pending']    = 'Pending';
 $string['action_suspended']  = 'Suspended';
-$string['action_withdrawn']  = 'Withdrawn';
+$string['action_withdrawn']  = 'Removed';
 $string['cohortnotfound']    = 'Cohort not found.';
 $string['colheader_action']      = 'Action';
 $string['colheader_datechanged'] = 'Date changed';
@@ -36,10 +36,14 @@ $string['colheader_shortname']   = 'Class code';
 $string['colheader_student']     = 'Tauira';
 $string['graceperiod']      = 'Grace period.';
 $string['graceperiod_help'] = 'The length of time of the manual enrolment, which effectively means
-                               the period before a student will be removed from the course.';
+                               the period before a student will be removed from the course.
+                               Requires <a href="settings.php?section=enrolsettingsmanual">Manual Enrolment</a> expiry action to be \'Unenrol user from course\'.';
 $string['history']          = 'Withdrawal history';
+$string['nostatus']         = 'Invalid status: {$a}.';
 $string['notincohort']      = 'The student was not found in this cohort.';
 $string['pluginname']       = 'TWOA withdraw process webservices';
 $string['privacy:metadata'] = 'The local webservices withdraw plugin does not store any personal data.';
-$string['studentnotfound']  = 'No student was not found with this id.';
-$string['summary']          = 'Suspended from {$a->suspended} courses, unenrolled from {$a->unenrolled} courses.';
+$string['skipchecks']       = 'Skip mahi checks for X.';
+$string['skipchecks_help']  = 'If the status is X (Early Withdrawn), immediately withdraw the tauira without checking for marked mahi.';
+$string['studentnotfound']  = 'No student was found with this id.';
+$string['summary']          = '{$a->user} suspended from {$a->suspended} courses, removed from {$a->unenrolled} courses, pending removal in {$a->pending} courses.';
