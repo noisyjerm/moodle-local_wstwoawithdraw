@@ -1,4 +1,4 @@
-# Moodle Webservices for Cohort Enrolment.
+# Moodle Webservices for Student Withdrawal (Safe removal from course).
 
 * [What is this plugin and why was it developed?](#what-is-this-plugin-and-why-was-it-developed?)
 * [What can this plugin do?](#what-can-this-plugin-do?)
@@ -29,10 +29,10 @@ This plugin can be used in accordance with the official
 <a href="https://docs.moodle.org/en/Using_web_services" target="_blank">Moodle documentation</a>.
 
 In addition to required parameters, 
-a Moodle user id and a cohort idnumber must be included. The cohort idnumber will map to the SMS class id.
+a Moodle user id and a cohort id must be included. 
 
 Example JSON responses.
 -----------------------
-{"success":true,"comment":"Suspended from 1 courses, unenrolled from 0 courses."}
+{"success":true,"comment":"Suspended from 1 courses, removed from 0 courses, pending removal in 0 courses."}
 {"success":false,"comment":"Cohort not found."}
 {"success":false,"comment":"The student was not found in this cohort.'}
