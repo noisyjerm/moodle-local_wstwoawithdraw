@@ -76,7 +76,7 @@ class local_wstwoawithdraw_removestudent extends external_api {
                 'testing' => new external_value(
                     PARAM_BOOL,
                     'No changes made.',
-                    VALUE_OPTIONAL,
+                    VALUE_DEFAULT,
                     0
                 ),
             ]
@@ -90,7 +90,7 @@ class local_wstwoawithdraw_removestudent extends external_api {
      * @param string $withdrawalstatus SMS enrolement status.
      * @return array
      */
-    public static function unenrolstudent($userid, $cohortid, $withdrawalstatus, $testing) {
+    public static function unenrolstudent($userid, $cohortid, $withdrawalstatus, $testing=0) {
         global $DB;
         $suspended = 0;
         $pending = 0;
