@@ -31,7 +31,7 @@ $plugin->requires = 2024100700;
 
 // Plugin details.
 $plugin->component  = 'local_wstwoawithdraw';
-$plugin->version    = 2026021801;   // Plugin updated Huitanguru 2026.
+$plugin->version    = 2026021802;   // Plugin updated Huitanguru 2026.
 $plugin->release    = 'v4.5-r1';
 
 // Plugin status details.
