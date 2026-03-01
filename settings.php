@@ -26,11 +26,11 @@
 defined('MOODLE_INTERNAL') || die;
 
 if ($hassiteconfig) {
-    $pluginsettings = new admin_settingpage('local_ws_twoawithdraw', get_string('pluginname', 'local_wstwoawithdraw'));
+    $pluginsettings = new admin_settingpage('local_wstwoawithdraw', get_string('pluginname', 'local_wstwoawithdraw'));
     $name = new lang_string('graceperiod', 'local_wstwoawithdraw');
     $description = new lang_string('graceperiod_help', 'local_wstwoawithdraw');
     $graceperiod = 21 * (24 * 60 * 60);
-    $setting = new admin_setting_configduration('local_ws_twoawithdraw/graceperiod',
+    $setting = new admin_setting_configduration('local_wstwoawithdraw/graceperiod',
         $name,
         $description,
         $graceperiod);
@@ -38,7 +38,7 @@ if ($hassiteconfig) {
 
     $name = new lang_string('skipchecks', 'local_wstwoawithdraw');
     $description = new lang_string('skipchecks_help', 'local_wstwoawithdraw');
-    $setting = new admin_setting_configcheckbox('local_ws_twoawithdraw/skipchecks',
+    $setting = new admin_setting_configcheckbox('local_wstwoawithdraw/skipchecks',
         $name,
         $description,
         1

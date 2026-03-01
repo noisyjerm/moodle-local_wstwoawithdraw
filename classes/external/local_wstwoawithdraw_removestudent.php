@@ -46,8 +46,8 @@ require_once($CFG->dirroot.'/enrol/manual/externallib.php');
 class local_wstwoawithdraw_removestudent extends external_api {
     /** @var string Regular expression to match the grade category id on */
     const GRADECAT_PATTERN = '/(W[A-Z]{4}\d{3}|Q\d{5})(\.{1}\d{1,2})?/';
-    /** @var int Delay before completely removing student from the course. */
-
+    /** @var array List of valid enrolment statuses that the api will accept. */
+    const ALLOWED_STATUSES = ['W', 'X', 'D'];
     /**
      *
      * @return \external_function_parameters
@@ -106,16 +106,22 @@ class local_wstwoawithdraw_removestudent extends external_api {
 
         // Start with basic checks.
         if (!$student) {
-            return ['success' => false, 'comment' => get_string('studentnotfound', 'local_wstwoawithdraw')];
+            return ['success' => false, 'comment' => get_string('studentnotfound', 'local_wstwoawithdraw', $params['userid'])];
         }
         if (!$cohort) {
-            return ['success' => false, 'comment' => get_string('cohortnotfound', 'local_wstwoawithdraw')];
+            return ['success' => false, 'comment' => get_string('cohortnotfound', 'local_wstwoawithdraw', $params['cohortid'])];
         }
-        if (!in_array($params['withdrawalstatus'], ['W', 'X', 'D'])) {
+        if (!in_array($params['withdrawalstatus'], self::ALLOWED_STATUSES)) {
             return ['success' => false, 'comment' => get_string('nostatus', 'local_wstwoawithdraw', $params['withdrawalstatus'])];
         }
         if (!cohort_is_member($cohort->id, $params['userid'])) {
-            return ['success' => false, 'comment' => get_string('notincohort', 'local_wstwoawithdraw')];
+            return ['success' => false,
+                'comment' => get_string(
+                    'notincohort',
+                    'local_wstwoawithdraw',
+                    ['user' => $params['userid'], 'cohort' => $params['cohortid']]
+                ),
+            ];
         }
 
         // Get the enrolment methods (therefore courses) associated with this cohort.
@@ -138,7 +144,7 @@ class local_wstwoawithdraw_removestudent extends external_api {
             ];
 
             // We can skip these checks for X and D if allowed in the config.
-            if (!get_config('local_wstwoawithdraw', 'skipchecks') || $params['withdrawalstatus'] === 'W') {
+            if (get_config('local_wstwoawithdraw', 'skipchecks') === '0' || $params['withdrawalstatus'] === 'W') {
                 // Get a list of all the assessed activities in this course.
                 $allgradeditems = [];
                 $gradedcategories = self::get_gradedcategories($enrolmethod->courseid);
